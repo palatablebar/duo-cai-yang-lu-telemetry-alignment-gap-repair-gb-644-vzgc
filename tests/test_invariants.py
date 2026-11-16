@@ -1,4 +1,4 @@
-"""不变量：行账守恒、网格守恒、幂等重跑、补齐不回流。"""
+"""不变量：行账守恒、网格守恒、幂等重跑、补齐不回流、交接证据可追回。"""
 
 from __future__ import annotations
 
@@ -6,8 +6,12 @@ from decimal import Decimal
 
 from app import store
 from app.modules.m6_batches import service
+from app.modules.m8_handover import service as handover_service
 
 from expected import EDGE, GAP, MAIN
+
+SHIFT_START = "2026-03-01T00:00:00Z"
+SHIFT_END = "2026-03-01T00:15:00Z"
 
 
 def test_row_account_conserved(conn):
@@ -94,3 +98,65 @@ def test_watermark_monotonic_across_replay(conn, run_main):
     ]
     assert late_before == late_after
     assert len(late_before) == MAIN["late"]
+
+
+def test_handover_is_idempotent_invariant(conn, run_main):
+    """交接不变量一：同班次重复交接不新增交接包、窗口与证据。"""
+    first = handover_service.prepare_handover(
+        conn, run_id=None, shift_date=SHIFT_START, shift_end=SHIFT_END
+    )
+    handover_service.prepare_handover(
+        conn, run_id=None, shift_date=SHIFT_START, shift_end=SHIFT_END
+    )
+    assert store.value(conn, "SELECT COUNT(*) FROM handovers", (), 0) == 1
+    assert store.value(
+        conn, "SELECT COUNT(*) FROM handover_windows WHERE handover_id=?",
+        (first["handover_id"],), 0,
+    ) == len(first["windows"])
+    assert store.value(
+        conn, "SELECT COUNT(*) FROM handover_evidence WHERE handover_id=?",
+        (first["handover_id"],), 0,
+    ) == first["scope"]["retained_samples"]
+
+
+def test_handover_evidence_survives_reclaim_and_restores(conn, run_main):
+    """交接不变量二：腾空间后证据仍在，回滚把每条被删原始采样追回。"""
+    pkg = handover_service.prepare_handover(
+        conn, run_id=None, shift_date=SHIFT_START, shift_end=SHIFT_END
+    )
+    hid = pkg["handover_id"]
+    rid = run_main["run_id"]
+    handover_service.confirm_handover(conn, hid)
+    handover_service.reclaim_space(conn, hid)
+
+    # 在线采样已腾出，证据快照原样保留
+    assert store.value(
+        conn, "SELECT COUNT(*) FROM samples WHERE run_id=? AND bucket_utc >= ?",
+        (rid, SHIFT_END), 0,
+    ) == 0
+    assert store.value(
+        conn, "SELECT COUNT(*) FROM handover_evidence WHERE handover_id=?", (hid,), 0
+    ) == pkg["scope"]["retained_samples"]
+
+    handover_service.rollback_handover(conn, hid)
+    restored = store.value(
+        conn,
+        "SELECT COUNT(*) FROM samples WHERE run_id=? AND flags='RESTORED_FROM_HANDOVER'",
+        (rid,), 0,
+    )
+    assert restored == pkg["scope"]["retained_samples"]
+
+
+def test_handover_window_observed_matches_retained_invariant(conn, run_main):
+    """交接不变量三：每个有数据的跨班窗口，登记实有桶数 = 保留证据数。"""
+    pkg = handover_service.prepare_handover(
+        conn, run_id=None, shift_date=SHIFT_START, shift_end=SHIFT_END
+    )
+    retained: dict[tuple, int] = {}
+    for ev in handover_service.evidence_of(conn, pkg["handover_id"]):
+        key = (ev["sensor_id"], ev["window_start"])
+        retained[key] = retained.get(key, 0) + 1
+    for window in handover_service.windows_of(conn, pkg["handover_id"]):
+        if window["cross_shift"] and window["observed"] > 0:
+            assert retained[(window["sensor_id"], window["window_start"])] == window["observed"]
+    assert pkg["checks"]["passed"] is True

@@ -64,6 +64,15 @@ docker compose exec -T app python -m pytest -q
 | GET | `/api/export/quarantine.csv` | 隔离 CSV |
 | GET | `/api/export/manifest.json` | 运行清单 |
 | GET | `/api/export/evidence` | 单元格证据，参数 `sensor_id` 与 `bucket` |
+| POST | `/api/handovers` | 起草班次交接包，body `{"shift_date": "...", "shift_end": "..."}`（`shift_end` 可省，默认 +1 天） |
+| GET | `/api/handovers` | 交接包清单 |
+| GET | `/api/handovers/{id}` | 单个交接包（范围、窗口、证据、事件） |
+| POST | `/api/handovers/{id}/confirm` | 确认交接（DRAFT → CONFIRMED） |
+| GET | `/api/handovers/{id}/reclaim` | 腾空间判定：`RECLAIM_NOW` 或 `WAIT_EVIDENCE`（带阻塞原因） |
+| POST | `/api/handovers/{id}/reclaim` | 执行腾空间，只清已被证据覆盖的在线数据 |
+| POST | `/api/handovers/{id}/rollback` | 交接失败回滚，恢复上一版结果与原始记录 |
+| GET | `/api/handovers/{id}/windows` | 交接包窗口（含跨班标记与保留采样数） |
+| GET | `/api/handovers/{id}/evidence` | 保留证据快照，可加 `limit` |
 
 ## 常见失败
 
@@ -73,3 +82,9 @@ docker compose exec -T app python -m pytest -q
 | 400 `HEADER_MISSING` | 输入列名不在别名表内 | 在 `app/modules/m1_intake/sniff.py` 的别名表补一条 |
 | 404 `RUN_NOT_FOUND` | 指定了不存在的批次号 | 省略 `run_id` 参数即取最近批次 |
 | 四账「不平」 | 有人改了落库行 | 用 `POST /api/grid` 与 `POST /api/gaps/repair` 重新推导比对，差额在 `/batches` 可见 |
+| 400 `SHIFT_BOUND_INVALID` | 班次日界不是合法 ISO8601 | 用 `YYYY-MM-DD` 或 `YYYY-MM-DDTHH:MM:SSZ`，终点必须晚于起点 |
+| 400 `SHIFT_WINDOW_EMPTY` | 班次范围内没有任何 15 分钟窗口 | 扩大班次范围或换一个覆盖到数据的日界 |
+| 409 `HANDOVER_CHECK_FAILED` | 窗口登记实有桶与保留证据对不上 | 在 `/handovers` 看「交叉复核」的差额行，先补齐证据再确认 |
+| 409 `RECLAIM_BLOCKED` | 交接包未确认 / 复核未过 / 四账不平 | 按 `blockers` 逐项处理，判定回到 `RECLAIM_NOW` 再腾空间 |
+| 409 `HANDOVER_ROLLED_BACK` | 对已回滚的交接包再次确认 | 回滚包不可复活，按同一班次日界重新起草新交接包（复用快照） |
+| 在线数据已被腾出 | 交接包确认后执行了 reclaim | 用 `POST /api/handovers/{id}/rollback`，原始采样从证据快照逐条恢复 |

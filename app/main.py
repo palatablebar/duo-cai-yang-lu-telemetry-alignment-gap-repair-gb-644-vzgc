@@ -15,6 +15,7 @@ from app.modules.m4_grid import handler as m4
 from app.modules.m5_gaps import handler as m5
 from app.modules.m6_batches import handler as m6
 from app.modules.m7_export import handler as m7
+from app.modules.m8_handover import handler as m8
 
 
 @asynccontextmanager
@@ -39,7 +40,7 @@ app.add_exception_handler(errors.GridlabError, errors.handle_gridlab_error)
 
 app.mount("/static", StaticFiles(directory=str(config.STATIC_DIR)), name="static")
 
-for module in (m1, m2, m3, m4, m5, m6, m7):
+for module in (m1, m2, m3, m4, m5, m6, m7, m8):
     app.include_router(module.router)
 
 

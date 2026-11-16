@@ -56,3 +56,29 @@
 | 仅表头 | `HEADER_ONLY` | 声明了列但没有数据行 |
 
 三种空态都会生成批次，四账按 0 对 0 判平，结论码显示在总览页。
+
+## 班次交接（M8）
+
+### 交接状态机
+
+| 状态 | 含义 | 可执行动作 |
+|---|---|---|
+| `DRAFT` | 已起草，窗口与证据已快照，尚未确认 | 确认；不能腾空间 |
+| `CONFIRMED` | 交叉复核通过且已确认，结果可作为发布依据 | 腾空间、回滚 |
+| `ROLLED_BACK` | 交接失败已回滚，上一版结果恢复 | 不可复活，需重新起草 |
+
+### 交接表
+
+| 表 | 粒度 | 关键列 | 说明 |
+|---|---|---|---|
+| `handovers` | 一个班次一行 | `handover_id`、`shift_key`（唯一）、`state`、`previous_id`、`scope_json`、`checks_json` | `shift_key` 由源批次 + 班次日界确定性派生，撞键即复用，保证同班次不重复生成 |
+| `handover_windows` | 交接包 × 传感器 × 窗口 | `cross_shift`、`observed`、`retained` | 跨班窗口整窗保留；`retained` 是该窗保留的原始采样数 |
+| `handover_evidence` | 跨班窗口内每条原始采样 | `source_row`、`value`、`sample_sha256`、`window_start` | 独立快照，不依赖源批次在线表是否被清理 |
+| `handover_events` | 交接事件 | `seq`、`event`、`actor` | `PREPARED / CONFIRMED / RECLAIMED / ROLLED_BACK` 审计轨迹 |
+
+### 跨班与腾空间口径
+
+- 跨班判据：`窗口起点 <= 班末 < 窗口末端`；窗口右端开，末端恰等班末不算跨班。
+- 腾空间只删除「班末之外」且「在 `handover_evidence` 中有同传感器同桶快照」的在线采样，以及班末之外的 grid/windows；班内数据与全部交接表保留。
+- 交叉复核：每个有 `observed > 0` 的跨班窗口，其 `retained` 必须等于 `observed`；`observed = 0` 的空窗口允许零证据。复核不过则交接停在 `DRAFT`，腾空间判定为 `WAIT_EVIDENCE`。
+- 证据快照摘要 `evidence_digest` 是对全部证据行规范 JSON 的 sha256，任一行被改即变。

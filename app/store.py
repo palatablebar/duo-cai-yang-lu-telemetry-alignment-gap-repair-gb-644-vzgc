@@ -121,12 +121,68 @@ CREATE TABLE IF NOT EXISTS reconcile (
     note       TEXT NOT NULL
 );
 
+CREATE TABLE IF NOT EXISTS handovers (
+    handover_id   TEXT PRIMARY KEY,
+    shift_key     TEXT NOT NULL UNIQUE,
+    run_id        TEXT NOT NULL,
+    shift_date    TEXT NOT NULL,
+    shift_start   TEXT NOT NULL,
+    shift_end     TEXT NOT NULL,
+    state         TEXT NOT NULL,
+    previous_id   TEXT,
+    scope_json    TEXT NOT NULL,
+    checks_json   TEXT NOT NULL,
+    created_at    TEXT NOT NULL,
+    confirmed_at  TEXT,
+    rolled_back_at TEXT
+);
+
+CREATE TABLE IF NOT EXISTS handover_windows (
+    handover_id   TEXT NOT NULL,
+    sensor_id     TEXT NOT NULL,
+    window_start  TEXT NOT NULL,
+    window_end    TEXT NOT NULL,
+    observed      INTEGER NOT NULL,
+    expected      INTEGER NOT NULL,
+    coverage      TEXT NOT NULL,
+    state         TEXT NOT NULL,
+    cross_shift   INTEGER NOT NULL,
+    retained      INTEGER NOT NULL
+);
+
+CREATE TABLE IF NOT EXISTS handover_evidence (
+    handover_id   TEXT NOT NULL,
+    sensor_id     TEXT NOT NULL,
+    bucket_utc    TEXT NOT NULL,
+    source_row    INTEGER NOT NULL,
+    value         TEXT,
+    unit          TEXT NOT NULL,
+    quality       TEXT NOT NULL,
+    raw_value     TEXT,
+    sample_sha256 TEXT NOT NULL,
+    window_start  TEXT NOT NULL,
+    cross_shift   INTEGER NOT NULL
+);
+
+CREATE TABLE IF NOT EXISTS handover_events (
+    handover_id   TEXT NOT NULL,
+    seq           INTEGER NOT NULL,
+    event         TEXT NOT NULL,
+    actor         TEXT NOT NULL,
+    detail_json   TEXT NOT NULL,
+    created_at    TEXT NOT NULL
+);
+
 CREATE INDEX IF NOT EXISTS idx_samples_run ON samples(run_id);
 CREATE INDEX IF NOT EXISTS idx_quarantine_run ON quarantine(run_id);
 CREATE INDEX IF NOT EXISTS idx_grid_run ON grid(run_id);
 CREATE INDEX IF NOT EXISTS idx_windows_run ON windows(run_id);
 CREATE INDEX IF NOT EXISTS idx_reconcile_run ON reconcile(run_id);
 CREATE INDEX IF NOT EXISTS idx_duplicates_run ON duplicates(run_id);
+CREATE INDEX IF NOT EXISTS idx_ho_run ON handovers(run_id);
+CREATE INDEX IF NOT EXISTS idx_ho_windows ON handover_windows(handover_id);
+CREATE INDEX IF NOT EXISTS idx_ho_evidence ON handover_evidence(handover_id);
+CREATE INDEX IF NOT EXISTS idx_ho_events ON handover_events(handover_id);
 """
 
 

@@ -22,6 +22,7 @@ NAV = (
     {"key": "grid", "href": "/grid", "label": "网格"},
     {"key": "gaps", "href": "/gaps", "label": "缺口"},
     {"key": "batches", "href": "/batches", "label": "批次"},
+    {"key": "handovers", "href": "/handovers", "label": "交接"},
 )
 
 

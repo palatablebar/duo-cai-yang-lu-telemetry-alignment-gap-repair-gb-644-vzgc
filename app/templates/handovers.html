@@ -1,0 +1,232 @@
+{% extends "base.html" %}
+{% block title %}班次交接{% endblock %}
+{% block statusline %}{% if view and view.count %}共 {{ view.count }} 个交接包{% else %}无交接{% endif %}{% endblock %}
+
+{% block body %}
+<section class="sheet-head">
+  <h1 class="h1">班次交接包</h1>
+  <div class="head-tools">
+    <a class="link" href="/api/handovers">交接 JSON</a>
+  </div>
+</section>
+
+<section class="block">
+  <div class="block-head">
+    <h2 class="h2">起草交接</h2>
+    <span class="block-meta mono">班次日界 UTC，可填日期或完整时刻</span>
+  </div>
+  <form class="import" id="handover-form">
+    <label class="field"><span class="field-k">班次日界</span>
+      <input id="shift-date" class="mono" type="text" value="2026-03-01T00:15:00Z" style="min-width:200px">
+    </label>
+    <button class="btn" id="handover-btn" type="submit">生成交接包</button>
+    <span class="hint" id="handover-hint"></span>
+  </form>
+  <p class="empty-text" style="margin-top:6px">
+    窗口起点落在班内、末端越过班末即判<span class="tag warn">跨班</span>，整窗保留到下一班；
+    跨班窗口内的原始采样逐条快照并自带 sha256。
+  </p>
+</section>
+
+{% if view and view.handovers %}
+<section class="block">
+  <div class="block-head">
+    <h2 class="h2">交接包清单</h2>
+    <span class="block-meta mono">{{ view.count }} 个</span>
+  </div>
+  <div class="scroll">
+    <table class="sheet-grid wide" data-sheet>
+      <thead>
+        <tr class="letters"><th class="gutter"></th><th>A</th><th>B</th><th>C</th><th>D</th><th class="num">E</th><th class="num">F</th><th>G</th><th>H</th></tr>
+        <tr class="cols"><th class="gutter">#</th><th>交接号</th><th>源批次</th><th>班次起</th><th>班次止</th><th class="num">跨班窗</th><th class="num">证据</th><th>状态</th><th>上一版</th></tr>
+      </thead>
+      <tbody>
+        {% for ho in view.handovers %}
+        <tr>
+          <th class="gutter">{{ loop.index }}</th>
+          <td tabindex="0" class="mono">{{ ho.handover_id }}</td>
+          <td tabindex="0" class="mono">{{ ho.run_id }}</td>
+          <td tabindex="0" class="mono">{{ ho.shift_start|f_utc("%m-%d %H:%M") }}</td>
+          <td tabindex="0" class="mono">{{ ho.shift_end|f_utc("%m-%d %H:%M") }}</td>
+          <td tabindex="0" class="num">{{ ho.scope.cross_windows }}</td>
+          <td tabindex="0" class="num">{{ ho.scope.retained_samples }}</td>
+          <td tabindex="0"><span class="tag {{ 'ok' if ho.state == 'CONFIRMED' else ('warn' if ho.state == 'DRAFT' else 'bad') }}">{{ ho.state }}</span></td>
+          <td tabindex="0" class="mono">{{ ho.previous_id or "—" }}</td>
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+</section>
+
+{% if detail %}
+<section class="block">
+  <div class="block-head">
+    <h2 class="h2">交接范围 · {{ detail.handover_id }}</h2>
+    <span class="block-meta mono">{{ detail.shift_start }} → {{ detail.shift_end }}</span>
+  </div>
+  <div class="scroll">
+    <table class="sheet-grid" data-sheet>
+      <thead>
+        <tr class="letters"><th class="gutter"></th><th>A</th><th class="num">B</th></tr>
+        <tr class="cols"><th class="gutter">#</th><th>范围项</th><th class="num">值</th></tr>
+      </thead>
+      <tbody>
+        <tr><th class="gutter">1</th><td tabindex="0">班内窗口总数</td><td tabindex="0" class="num">{{ detail.scope.windows_total }}</td></tr>
+        <tr><th class="gutter">2</th><td tabindex="0">跨班窗口</td><td tabindex="0" class="num">{{ detail.scope.cross_windows }}</td></tr>
+        <tr><th class="gutter">3</th><td tabindex="0">班内采纳采样</td><td tabindex="0" class="num">{{ detail.scope.samples_in_shift }}</td></tr>
+        <tr><th class="gutter">4</th><td tabindex="0">保留原始采样（证据）</td><td tabindex="0" class="num">{{ detail.scope.retained_samples }}</td></tr>
+        <tr><th class="gutter">5</th><td tabindex="0">源批次采纳 / 隔离 / 网格</td><td tabindex="0" class="num">{{ detail.scope.accepted }} / {{ detail.scope.quarantined }} / {{ detail.scope.grid_points }}</td></tr>
+        <tr><th class="gutter">6</th><td tabindex="0">证据快照摘要</td><td tabindex="0" class="mono sha">{{ detail.scope.evidence_digest }}</td></tr>
+      </tbody>
+    </table>
+  </div>
+</section>
+
+<section class="block">
+  <div class="block-head">
+    <h2 class="h2">交叉复核</h2>
+    <span class="block-meta mono">
+      <span class="tag {{ 'ok' if detail.checks.passed else 'bad' }}">{{ "通过" if detail.checks.passed else "未通过" }}</span>
+    </span>
+  </div>
+  <div class="scroll">
+    <table class="sheet-grid" data-sheet>
+      <thead>
+        <tr class="letters"><th class="gutter"></th><th>A</th><th class="num">B</th><th class="num">C</th><th class="num">D</th><th>E</th></tr>
+        <tr class="cols"><th class="gutter">#</th><th>复核账</th><th class="num">应有</th><th class="num">实得</th><th class="num">差额</th><th>状态</th></tr>
+      </thead>
+      <tbody>
+        {% for line in detail.checks.lines %}
+        <tr>
+          <th class="gutter">{{ loop.index }}</th>
+          <td tabindex="0">{{ line.name }}<div class="block-meta">{{ line.note }}</div></td>
+          <td tabindex="0" class="num">{{ line.expected }}</td>
+          <td tabindex="0" class="num">{{ line.actual }}</td>
+          <td tabindex="0" class="num">{{ line.delta }}</td>
+          <td tabindex="0"><span class="tag {{ 'ok' if line.state == 'OK' else 'bad' }}">{{ line.state }}</span></td>
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+</section>
+
+{% if decision %}
+<section class="block">
+  <div class="block-head">
+    <h2 class="h2">腾空间判定</h2>
+    <span class="block-meta mono">
+      <span class="tag {{ 'ok' if decision.reclaimable else 'warn' }}">{{ decision.decision }}</span>
+    </span>
+  </div>
+  <div class="import" style="margin:6px 0">
+    <button class="btn" id="confirm-btn" type="button" data-id="{{ detail.handover_id }}">确认交接</button>
+    <button class="btn ghost" id="reclaim-btn" type="button" data-id="{{ detail.handover_id }}">腾空间</button>
+    <button class="btn ghost" id="rollback-btn" type="button" data-id="{{ detail.handover_id }}">交接失败回滚</button>
+    <span class="hint" id="action-hint"></span>
+  </div>
+  <p class="empty-text">{{ decision.note }}</p>
+  {% if decision.blockers %}
+  <div class="scroll">
+    <table class="sheet-grid" data-sheet>
+      <thead><tr class="letters"><th class="gutter"></th><th>A</th></tr>
+      <tr class="cols"><th class="gutter">#</th><th>阻塞原因（先等证据齐备）</th></tr></thead>
+      <tbody>
+        {% for blocker in decision.blockers %}
+        <tr><th class="gutter">{{ loop.index }}</th><td tabindex="0">{{ blocker }}</td></tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+  {% endif %}
+</section>
+{% endif %}
+
+<section class="block">
+  <div class="block-head">
+    <h2 class="h2">跨班窗口与采样</h2>
+    <span class="block-meta mono">{{ detail.windows|length }} 个窗口</span>
+  </div>
+  <div class="scroll">
+    <table class="sheet-grid wide" data-sheet>
+      <thead>
+        <tr class="letters"><th class="gutter"></th><th>A</th><th>B</th><th>C</th><th class="num">D</th><th class="num">E</th><th class="num">F</th><th>G</th><th class="num">H</th></tr>
+        <tr class="cols"><th class="gutter">#</th><th>传感器</th><th>窗口起</th><th>窗口止</th><th class="num">实有</th><th class="num">应有</th><th class="num">保留采样</th><th>跨班</th><th>状态</th></tr>
+      </thead>
+      <tbody>
+        {% for w in detail.windows %}
+        <tr>
+          <th class="gutter">{{ loop.index }}</th>
+          <td tabindex="0" class="mono">{{ w.sensor_id }}</td>
+          <td tabindex="0" class="mono">{{ w.window_start|f_utc("%m-%d %H:%M") }}</td>
+          <td tabindex="0" class="mono">{{ w.window_end|f_utc("%m-%d %H:%M") }}</td>
+          <td tabindex="0" class="num">{{ w.observed }}</td>
+          <td tabindex="0" class="num">{{ w.expected }}</td>
+          <td tabindex="0" class="num">{{ w.retained }}</td>
+          <td tabindex="0">{% if w.cross_shift %}<span class="tag warn">跨班</span>{% else %}<span class="tag quiet">班内</span>{% endif %}</td>
+          <td tabindex="0"><span class="tag {{ 'ok' if w.state == 'OK' else 'warn' }}">{{ w.state }}</span></td>
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+</section>
+
+<section class="block">
+  <div class="block-head">
+    <h2 class="h2">保留证据（原始采样快照）</h2>
+    <span class="block-meta mono">{{ detail.evidence|length }} 行</span>
+  </div>
+  {% if detail.evidence %}
+  <div class="scroll">
+    <table class="sheet-grid wide" data-sheet>
+      <thead>
+        <tr class="letters"><th class="gutter"></th><th>A</th><th>B</th><th class="num">C</th><th>D</th><th class="num">E</th><th>F</th><th>G</th><th>H</th><th>I</th></tr>
+        <tr class="cols"><th class="gutter">#</th><th>传感器</th><th>桶(UTC)</th><th class="num">原始行</th><th>单位</th><th class="num">值</th><th>质量</th><th>所属窗口</th><th>输入 sha256</th></tr>
+      </thead>
+      <tbody>
+        {% for ev in detail.evidence %}
+        <tr>
+          <th class="gutter">{{ loop.index }}</th>
+          <td tabindex="0" class="mono">{{ ev.sensor_id }}</td>
+          <td tabindex="0" class="mono">{{ ev.bucket_utc|f_utc("%m-%d %H:%M") }}</td>
+          <td tabindex="0" class="num">{{ ev.source_row }}</td>
+          <td tabindex="0">{{ ev.unit }}</td>
+          <td tabindex="0" class="num">{{ ev.value }}</td>
+          <td tabindex="0">{{ ev.quality }}</td>
+          <td tabindex="0" class="mono">{{ ev.window_start|f_utc("%H:%M") }}</td>
+          <td tabindex="0" class="mono sha">{{ ev.sample_sha256[:16] }}</td>
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+  {% else %}
+  <section class="empty"><p class="empty-text">本班次没有跨班窗口，无需保留快照。</p></section>
+  {% endif %}
+</section>
+
+<section class="block">
+  <div class="block-head"><h2 class="h2">交接事件</h2><span class="block-meta mono">{{ detail.events|length }} 条</span></div>
+  <div class="scroll">
+    <table class="sheet-grid" data-sheet>
+      <thead><tr class="letters"><th class="gutter"></th><th>A</th><th>B</th><th>C</th></tr>
+      <tr class="cols"><th class="gutter">#</th><th>事件</th><th>操作人</th><th>时间(UTC)</th></tr></thead>
+      <tbody>
+        {% for ev in detail.events %}
+        <tr><th class="gutter">{{ ev.seq }}</th><td tabindex="0">{{ ev.event }}</td><td tabindex="0">{{ ev.actor }}</td><td tabindex="0" class="mono">{{ ev.created_at|f_utc("%m-%d %H:%M:%S") }}</td></tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+</section>
+{% endif %}
+{% else %}
+<section class="empty"><p class="empty-text">还没有交接包。先在上方填班次日界并生成。</p></section>
+{% endif %}
+{% endblock %}
+
+{% block scripts %}
+<script src="/static/handover.js"></script>
+{% endblock %}

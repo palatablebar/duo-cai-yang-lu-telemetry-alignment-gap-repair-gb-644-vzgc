@@ -1,6 +1,6 @@
 # 深度登记 gridlab（多采样率遥测对齐与缺口修复）
 
-- 规模：中型（7 个功能模块 / 6 个页面 + base / 63 条测试）
+- 规模：中型（8 个功能模块 / 7 个页面 + base / 107 条测试）
 - 核心规则一：**时钟校正与分钟网格**——真值时间 = 采样时刻 − 设备偏移，偏移按 `[effective_from, effective_to)` 解析；同一传感器同一分钟重复按质量位 good > suspect > bad 择一，仍并列取到达较晚的一条；1 分钟桶为 `[t, t+1min)`，15 分钟窗口右端开。
 - 核心规则二：**缺口修复与覆盖度**——应有桶按采样率派生；连续缺席 ≤3 桶按传感器声明策略补齐（hold 取前值、linear 按桶距等分）并标 FILLED，>3 桶记 GAP 不插值；窗口覆盖度 = 实有 / 应有，低于 0.8 标 PARTIAL。
 - 使用者与工作流：环境监测站数据组每天接手 36 只传感器的 1 / 5 / 15 分钟混合导出件，设备时钟漂移 2–90 秒，报表按 15 分钟汇总；原先用表格手工对齐、缺口靠猜，现在一次导入即得「可采纳样本 + 1 分钟网格 + 补齐与缺口 + 窗口覆盖 + 四账」。
@@ -16,6 +16,7 @@
 | M5 缺口修复 | 看缺口段、补齐值与补齐校验 | GET /api/gaps、POST /api/gaps/repair、页面 /gaps | `app/modules/m5_gaps/fill.py` `app/modules/m5_gaps/repair.py` `app/modules/m5_gaps/policy.py` | `tests/test_m5_gaps.py` |
 | M6 批次与对账 | 查批次清单、四账与差异归因 | GET /api/batches、GET /api/reconcile、页面 /batches | `app/modules/m6_batches/compare.py` `app/modules/m6_batches/history.py` `app/modules/m6_batches/diff.py` `app/modules/m6_batches/service.py` | `tests/test_m6_batches.py` |
 | M7 导出 | 导出网格、采纳、隔离 CSV 与运行清单，点单元格看证据 | GET /api/export/grid.csv、GET /api/export/manifest.json、GET /api/export/evidence | `app/modules/m7_export/csv_out.py` `app/modules/m7_export/manifest_out.py` `app/modules/m7_export/evidence.py` | `tests/test_m7_export.py` |
+| M8 班次交接 | 看清交接范围与跨班窗口，判定先腾空间还是等证据，确认/回滚并保留原始采样证据 | POST /api/handovers、GET /api/handovers/{id}/reclaim、POST /api/handovers/{id}/rollback、页面 /handovers | `app/modules/m8_handover/service.py` `app/modules/m8_handover/shift_windows.py` `app/modules/m8_handover/evidence.py` `app/modules/m8_handover/crosscheck.py` | `tests/test_m8_handover.py` `tests/test_m8_handover_api.py` |
 
 端到端：`tests/test_e2e.py`（自带脏样例 → 采信 → 隔离 → 网格 → 缺口 → 四账 → 导出，含 4xx 失败输入与重跑）。
 不变量：`tests/test_invariants.py`（行账守恒、网格守恒、幂等重跑、补齐不回流）。
@@ -35,6 +36,8 @@
 | TRAP-16 | 导出件最后一行在中间被截断 | 半行被当有效数据，凭空多一条采样 | 无结尾换行且列数不足即判尾行截断，整行拒绝 | `app/modules/m1_intake/reader.py` | `tests/test_m1_samples.py::test_trap_16_truncated_tail_rejected` |
 | TRAP-18 | 0 字节 / 全空行 / 仅表头 三种空态 | 都返回「导入 0 行」，使用者不知道差在哪 | 三种空态分别给 EMPTY_FILE / ALL_BLANK / HEADER_ONLY 结论 | `app/modules/m1_intake/reader.py`、`app/modules/m1_intake/service.py` | `tests/test_m1_samples.py::test_trap_18_three_empty_states` |
 | TRAP-23 | 15 分钟窗口端点 00:15:00 归属哪一侧 | 两端都算，同一采样进两个窗口 | 声明左闭右开 `[start, end)`，端点归右窗口 | `app/modules/m4_grid/windows.py` | `tests/test_m4_grid.py::test_trap_23_window_is_half_open` |
+| TRAP-24 | 班末恰在窗口端点（班末 00:15，窗口 00:15–00:30），该窗口算本班还是下一班 | 按「起点必须严格早于班末」把它整窗推给下一班，本班已采的点失去依据；或反过来在两班重复计 | 跨班判据 `start <= 班末 < end`：起点恰在班末、末端伸入下一班的窗口由本班整窗交出，右端开保证末端恰等班末的窗口不跨班 | `app/modules/m8_handover/shift_windows.py` | `tests/test_m8_handover.py::test_window_half_open_boundary_is_not_double_counted` |
+| TRAP-25 | 腾出在线空间后跨班窗口的原始采样被一并删掉，补算无据可依 | 只引用源批次表，源批次一清理证据就断链 | 跨班窗口原始采样独立快照进 handover_evidence 并自带 sha256，腾空间只删「已被快照覆盖」的在线行，回滚按快照逐条恢复 | `app/modules/m8_handover/evidence.py` `app/modules/m8_handover/service.py` | `tests/test_m8_handover.py::test_rollback_restores_purged_samples_from_snapshot` |
 
 ## 对账规则
 
@@ -42,12 +45,13 @@
 - 网格账：`应有桶 = 实有 + 补齐 + 缺口`，应有桶按采样率与全局区间独立派生
 - 数值账：`采纳合计 = 实有合计`（补齐值单独统计，不回流采纳合计）
 - 窗口账：`应有窗口 = 落库窗口`，窗口按 15 分钟对齐派生
-- 四账在 `GET /api/reconcile`、`/batches` 页面与 `manifest.json` 中同时可见；任一账差额非 0 显示「不平」并给出归因提示。
+- 交接复核账（M8）：`跨班窗口登记实有桶 = 保留证据数`，observed=0 的空窗口允许零证据；任一有数据跨班窗口对不上即复核失败，禁止确认与腾空间。
+- 四账在 `GET /api/reconcile`、`/batches` 页面与 `manifest.json` 中同时可见；任一账差额非 0 显示「不平」并给出归因提示。交接复核在 `/handovers` 页面与 `GET /api/handovers/{id}` 同时可见。
 
 ## 反例与不变量
 
 - 反例（朴素实现会挂）：`tests/test_m4_grid.py::test_trap_14_tie_breaks_on_later_arrival`（按文件顺序取第一条会保留 39.5，正确保留迟到的 39.9）、`tests/test_m2_timebase.py::test_naive_local_bucket_differs`（不校正偏移会把 00:15:20 记成 00:15，正确是 00:15:00 减去 20 秒后的 00:15——写成 00:15:20 再取分钟则落到 00:15，看似相同但偏移 90 秒的 PM-02 会整体错位一分）、`tests/test_m1_samples.py::test_naive_splitlines_would_break_records`、`tests/test_m5_gaps.py::test_naive_fill_all_gaps_would_invent_values`（把 10 桶缺口也插值会凭空造 10 个值）。
-- 不变量：`tests/test_invariants.py::test_row_account_conserved`（行账守恒）、`tests/test_invariants.py::test_grid_account_conserved`（网格守恒）、`tests/test_invariants.py::test_rerun_is_idempotent`（幂等重跑行数与合计不变）、`tests/test_invariants.py::test_filled_values_do_not_leak_into_accepted`（补齐不回流）。
+- 不变量：`tests/test_invariants.py::test_row_account_conserved`（行账守恒）、`tests/test_invariants.py::test_grid_account_conserved`（网格守恒）、`tests/test_invariants.py::test_rerun_is_idempotent`（幂等重跑行数与合计不变）、`tests/test_invariants.py::test_filled_values_do_not_leak_into_accepted`（补齐不回流）、`tests/test_invariants.py::test_handover_is_idempotent_invariant`（同班次交接不重复生成）、`tests/test_invariants.py::test_handover_evidence_survives_reclaim_and_restores`（腾空间后证据仍在且回滚可追回）、`tests/test_invariants.py::test_handover_window_observed_matches_retained_invariant`（窗口与采样相互复核）。
 - 端到端：`tests/test_e2e.py::test_full_pipeline_to_export`。
 
 ## 已知不覆盖
@@ -57,3 +61,5 @@
 - DST 切换日按「偏移表区间重叠即歧义」处理，不做时区数据库推算；偏移表把切换日拆成两段即可表达，重叠则整行隔离。
 - 单位换算只覆盖 %RH、µg/m³、ppm、ppb、m/s、hPa 的写法归一，不做量纲换算（例如不把 ppb 折算成 µg/m³）。
 - 15 分钟窗口覆盖度按「桶数」计算，不按采样点数；同一分钟内的多次采样在去重阶段已收敛为一条。
+- 班次交接按「单站单批次 + 显式班次日界」实现，不做跨站汇总；交接证据只快照跨班窗口内的**采纳原始采样**，隔离行进既有隔离表、补齐桶无原始采样不入证据（在交叉复核里按 observed 口径区分）。
+- 交接回滚从证据快照恢复在线 `samples` 行并标 `RESTORED_FROM_HANDOVER`，不自动重算被清理的 grid/windows 派生表；需要刷新派生结果时对源批次重新跑网格与缺口推导即可。

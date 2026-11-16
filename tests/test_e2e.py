@@ -6,7 +6,7 @@ import json
 
 from expected import MAIN
 
-PAGES = ("/", "/samples", "/quality", "/grid", "/gaps", "/batches")
+PAGES = ("/", "/samples", "/quality", "/grid", "/gaps", "/batches", "/handovers")
 
 
 def test_full_pipeline_to_export(api):
