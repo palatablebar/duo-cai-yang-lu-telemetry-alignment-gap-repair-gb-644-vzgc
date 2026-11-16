@@ -1,0 +1,149 @@
+{% extends "base.html" %}
+{% block title %}批次{% endblock %}
+{% block statusline %}{% if view.latest %}共 {{ view.runs|length }} 个批次{% else %}无运行{% endif %}{% endblock %}
+
+{% block body %}
+<section class="sheet-head">
+  <h1 class="h1">批次与对账</h1>
+  <div class="head-tools">
+    <a class="link" href="/api/batches">批次 JSON</a>
+    <a class="link" href="/api/export/manifest.json">运行清单</a>
+  </div>
+</section>
+
+{% if view.runs %}
+<section class="block">
+  <div class="block-head">
+    <h2 class="h2">清单</h2>
+    <span class="block-meta mono">{{ view.runs|length }} 行</span>
+  </div>
+  <div class="scroll">
+    <table class="sheet-grid wide" data-sheet>
+      <thead>
+        <tr class="letters"><th class="gutter"></th><th>A</th><th>B</th><th class="num">C</th><th class="num">D</th><th class="num">E</th><th class="num">F</th><th>G</th></tr>
+        <tr class="cols"><th class="gutter">#</th><th>批次号</th><th>生成</th><th class="num">原始</th><th class="num">采纳</th><th class="num">隔离</th><th class="num">网格</th><th>四账</th></tr>
+      </thead>
+      <tbody>
+        {% for run in view.runs %}
+        <tr>
+          <th class="gutter">{{ loop.index }}</th>
+          <td tabindex="0" class="mono">{{ run.run_id }}</td>
+          <td tabindex="0" class="mono">{{ run.created_at|f_utc("%m-%d %H:%M") }}</td>
+          <td tabindex="0" class="num">{{ run.raw_records }}</td>
+          <td tabindex="0" class="num">{{ run.accepted }}</td>
+          <td tabindex="0" class="num">{{ run.quarantined }}</td>
+          <td tabindex="0" class="num">{{ run.grid_points }}</td>
+          <td tabindex="0"><span class="tag {{ 'ok' if run.balanced else 'bad' }}">{{ "平" if run.balanced else "不平" }}</span></td>
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+</section>
+
+{% if rec %}
+<section class="block">
+  <div class="block-head">
+    <h2 class="h2">四账</h2>
+    <span class="block-meta mono">{{ rec.conclusion }}</span>
+  </div>
+  <div class="scroll">
+    <table class="sheet-grid" data-sheet>
+      <thead>
+        <tr class="letters"><th class="gutter"></th><th>A</th><th class="num">B</th><th class="num">C</th><th class="num">D</th><th>E</th></tr>
+        <tr class="cols"><th class="gutter">#</th><th>账</th><th class="num">应有</th><th class="num">实得</th><th class="num">差额</th><th>状态</th></tr>
+      </thead>
+      <tbody>
+        {% for line in rec.lines %}
+        <tr>
+          <th class="gutter">{{ loop.index }}</th>
+          <td tabindex="0">{{ line.name }}</td>
+          <td tabindex="0" class="num">{{ line.expected }}</td>
+          <td tabindex="0" class="num">{{ line.actual }}</td>
+          <td tabindex="0" class="num">{{ line.delta }}</td>
+          <td tabindex="0"><span class="tag {{ 'ok' if line.state == 'OK' else 'bad' }}">{{ line.state }}</span></td>
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+</section>
+
+<section class="block">
+  <div class="block-head">
+    <h2 class="h2">运行清单</h2>
+    <span class="block-meta mono">{{ rec.run.rule_version }}</span>
+  </div>
+  <div class="scroll">
+    <table class="sheet-grid" data-sheet>
+      <thead>
+        <tr class="letters"><th class="gutter"></th><th>A</th><th>B</th></tr>
+        <tr class="cols"><th class="gutter">#</th><th>项</th><th>值</th></tr>
+      </thead>
+      <tbody>
+        <tr><th class="gutter">1</th><td tabindex="0">批次号</td><td tabindex="0" class="mono">{{ rec.run.run_id }}</td></tr>
+        <tr><th class="gutter">2</th><td tabindex="0">批次键</td><td tabindex="0" class="mono">{{ rec.run.run_key[:24] }}</td></tr>
+        <tr><th class="gutter">3</th><td tabindex="0">样例</td><td tabindex="0">{{ rec.run.sample_name }}</td></tr>
+        <tr><th class="gutter">4</th><td tabindex="0">偏移表</td><td tabindex="0">{{ rec.run.offset_name }}</td></tr>
+        <tr><th class="gutter">5</th><td tabindex="0">耗时</td><td tabindex="0" class="num">{{ rec.run.elapsed_ms }} ms</td></tr>
+      </tbody>
+    </table>
+  </div>
+</section>
+
+{% if exports %}
+<section class="block">
+  <div class="block-head">
+    <h2 class="h2">导出</h2>
+    <span class="block-meta mono">{{ exports.inputs|length }} 个输入</span>
+  </div>
+  <div class="scroll">
+    <table class="sheet-grid" data-sheet>
+      <thead>
+        <tr class="letters"><th class="gutter"></th><th>A</th><th>B</th><th class="num">C</th></tr>
+        <tr class="cols"><th class="gutter">#</th><th>文件</th><th>地址</th><th class="num">行数</th></tr>
+      </thead>
+      <tbody>
+        {% for file in exports.files %}
+        <tr>
+          <th class="gutter">{{ loop.index }}</th>
+          <td tabindex="0">{{ file.name }}</td>
+          <td tabindex="0"><a class="link mono" href="{{ file.path }}">{{ file.path }}</a></td>
+          <td tabindex="0" class="num">{{ file.rows }}</td>
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+</section>
+
+<section class="block">
+  <div class="block-head">
+    <h2 class="h2">输入摘要</h2>
+    <span class="block-meta mono">sha256</span>
+  </div>
+  <div class="scroll">
+    <table class="sheet-grid" data-sheet>
+      <thead>
+        <tr class="letters"><th class="gutter"></th><th>A</th><th>B</th><th class="num">C</th></tr>
+        <tr class="cols"><th class="gutter">#</th><th>输入</th><th>摘要</th><th class="num">字节</th></tr>
+      </thead>
+      <tbody>
+        {% for item in exports.inputs %}
+        <tr>
+          <th class="gutter">{{ loop.index }}</th>
+          <td tabindex="0">{{ item.name }}</td>
+          <td tabindex="0" class="mono sha">{{ item.sha256 }}</td>
+          <td tabindex="0" class="num">{{ item.bytes }}</td>
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+</section>
+{% endif %}
+{% endif %}
+{% else %}
+<section class="empty"><p class="empty-text">还没有批次记录。</p></section>
+{% endif %}
+{% endblock %}

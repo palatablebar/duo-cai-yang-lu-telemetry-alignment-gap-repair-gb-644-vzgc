@@ -1,0 +1,139 @@
+{% extends "base.html" %}
+{% block title %}总览{% endblock %}
+{% block statusline %}{% if run %}四账 {{ "相等" if balanced else "不平" }}{% else %}无运行{% endif %}{% endblock %}
+
+{% block body %}
+<section class="sheet-head">
+  <h1 class="h1">遥测网格总览</h1>
+  <form class="import" id="import-form" autocomplete="off">
+    <label class="field">
+      <span class="field-k">样例</span>
+      <select name="sample" id="sample-select">
+        {% for item in samples %}<option value="{{ item.key }}">{{ item.label }}</option>{% endfor %}
+      </select>
+    </label>
+    <label class="field">
+      <span class="field-k">偏移表</span>
+      <select name="offsets" id="offsets-select">
+        {% for item in offsets %}<option value="{{ item.key }}">{{ item.label }}</option>{% endfor %}
+      </select>
+    </label>
+    <button class="btn" type="submit" id="import-btn">导入样例</button>
+    <span class="hint" id="import-hint" role="status"></span>
+  </form>
+</section>
+
+{% if run %}
+<section class="block">
+  <div class="block-head">
+    <h2 class="h2">阶段</h2>
+    <span class="block-meta mono">{{ run.sample_name }} · {{ counts.raw_records }} 行</span>
+  </div>
+  <div class="scroll">
+    <table class="sheet-grid" data-sheet>
+      <thead>
+        <tr class="letters"><th class="gutter"></th><th>A</th><th class="num">B</th><th>C</th></tr>
+        <tr class="cols"><th class="gutter">#</th><th>阶段</th><th class="num">数值</th><th>单位</th></tr>
+      </thead>
+      <tbody>
+        {% for row in stages %}
+        <tr>
+          <th class="gutter">{{ loop.index }}</th>
+          <td tabindex="0">{{ row.name }}</td>
+          <td tabindex="0" class="num">{{ row.value }}</td>
+          <td tabindex="0">{{ row.unit }}</td>
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+</section>
+
+<section class="block">
+  <div class="block-head">
+    <h2 class="h2">合计</h2>
+    <span class="block-meta mono">{{ totals.grid_sum }} · 3 位小数</span>
+  </div>
+  <div class="scroll">
+    <table class="sheet-grid" data-sheet>
+      <thead>
+        <tr class="letters"><th class="gutter"></th><th>A</th><th class="num">B</th><th class="num">C</th></tr>
+        <tr class="cols"><th class="gutter">#</th><th>合计项</th><th class="num">数值</th><th class="num">占比</th></tr>
+      </thead>
+      <tbody>
+        <tr>
+          <th class="gutter">1</th><td tabindex="0">采纳合计</td>
+          <td tabindex="0" class="num">{{ totals.accepted_sum|f_num }}</td>
+          <td tabindex="0" class="num">100.0%</td>
+        </tr>
+        <tr>
+          <th class="gutter">2</th><td tabindex="0">补齐合计</td>
+          <td tabindex="0" class="num">{{ totals.filled_sum|f_num }}</td>
+          <td tabindex="0" class="num">{{ filled_share|f_pct }}</td>
+        </tr>
+        <tr>
+          <th class="gutter">3</th><td tabindex="0">网格合计</td>
+          <td tabindex="0" class="num">{{ totals.grid_sum|f_num }}</td>
+          <td tabindex="0" class="num">—</td>
+        </tr>
+      </tbody>
+    </table>
+  </div>
+</section>
+
+<section class="block">
+  <div class="block-head">
+    <h2 class="h2">四账</h2>
+    <span class="block-meta mono">{{ conclusion }}</span>
+  </div>
+  <div class="scroll">
+    <table class="sheet-grid" data-sheet>
+      <thead>
+        <tr class="letters"><th class="gutter"></th><th>A</th><th class="num">B</th><th class="num">C</th><th class="num">D</th><th>E</th></tr>
+        <tr class="cols"><th class="gutter">#</th><th>账</th><th class="num">应有</th><th class="num">实得</th><th class="num">差额</th><th>状态</th></tr>
+      </thead>
+      <tbody>
+        {% for line in lines %}
+        <tr>
+          <th class="gutter">{{ loop.index }}</th>
+          <td tabindex="0">{{ line.name }}</td>
+          <td tabindex="0" class="num">{{ line.expected }}</td>
+          <td tabindex="0" class="num">{{ line.actual }}</td>
+          <td tabindex="0" class="num">{{ line.delta }}</td>
+          <td tabindex="0"><span class="tag {{ 'ok' if line.state == 'OK' else 'bad' }}">{{ line.state }}</span></td>
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+</section>
+
+<section class="block">
+  <div class="block-head">
+    <h2 class="h2">批次</h2>
+    <a class="link" href="/batches">批次清单</a>
+  </div>
+  <div class="scroll">
+    <table class="sheet-grid" data-sheet>
+      <thead>
+        <tr class="letters"><th class="gutter"></th><th>A</th><th class="num">B</th><th>C</th><th>D</th></tr>
+        <tr class="cols"><th class="gutter">#</th><th>批次号</th><th class="num">耗时</th><th>样例</th><th>生成</th></tr>
+      </thead>
+      <tbody>
+        <tr>
+          <th class="gutter">1</th>
+          <td tabindex="0" class="mono">{{ run.run_id }}</td>
+          <td tabindex="0" class="num">{{ run.elapsed_ms }} ms</td>
+          <td tabindex="0">{{ run.sample_name }}</td>
+          <td tabindex="0" class="mono">{{ run.created_at|f_cn }}</td>
+        </tr>
+      </tbody>
+    </table>
+  </div>
+</section>
+{% else %}
+<section class="empty">
+  <p class="empty-text">还没有批次，先导入样例。</p>
+</section>
+{% endif %}
+{% endblock %}

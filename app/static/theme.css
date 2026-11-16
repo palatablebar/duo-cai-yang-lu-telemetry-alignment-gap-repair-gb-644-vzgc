@@ -1,0 +1,33 @@
+:root {
+  /* 表格网格 lane：纸底 + 单一紫强调，直角、极密 */
+  --bg: #f7f7f4;
+  --surface: #ffffff;
+  --surface-2: #efeee7;
+  --surface-3: #e5e3d8;
+  --ink: #191813;
+  --ink-mid: #3d3a32;
+  --ink-muted: #6d685c;
+  --line: #d9d5c7;
+  --line-strong: #b4ae9b;
+  --accent: #5b4b8a;
+  --accent-ink: #ffffff;
+  --accent-soft: #e9e4f1;
+  --ok: #2f6b3a;
+  --warn: #8a5b12;
+  --bad: #8c2f2f;
+  --info: #2f4f6b;
+  --font-ui: "PingFang SC", "Hiragino Sans GB", "Microsoft YaHei", Helvetica, Arial, sans-serif;
+  --font-num: "SFMono-Regular", Menlo, Consolas, "Liberation Mono", monospace;
+  --font-doc: "Songti SC", Georgia, serif;
+  --radius: 0px;
+  --radius-sm: 0px;
+  --pad: 6px;
+  --gap: 4px;
+  --row-h: 22px;
+  --cell-pad: 0 6px;
+  --shadow: none;
+  --head-bg: #e9e7de;
+  --gutter-bg: #f1efe7;
+  --focus-ring: #5b4b8a;
+  --grid-line: #d9d5c7;
+}

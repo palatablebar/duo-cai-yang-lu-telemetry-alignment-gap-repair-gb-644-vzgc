@@ -1,0 +1,43 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>{% block title %}总览{% endblock %} · gridlab</title>
+<link rel="stylesheet" href="/static/theme.css">
+<link rel="stylesheet" href="/static/layout.css">
+<link rel="stylesheet" href="/static/components.css">
+</head>
+<body>
+<div class="shell">
+  <header class="bar">
+    <div class="bar-id">
+      <span class="mark">gridlab</span>
+      <span class="slash">/</span>
+      <span class="unit-name">遥测网格</span>
+    </div>
+    <nav class="tabs">
+      {% for item in nav %}<a class="tab{% if item.key == active %} on{% endif %}" href="{{ item.href }}">{{ item.label }}</a>{% endfor %}
+    </nav>
+    <div class="bar-run">
+      <span class="k">批次</span><span class="v mono">{{ run.run_id if run else "—" }}</span>
+      <span class="k">规则</span><span class="v mono">{{ rule_version }}</span>
+      <span class="k">区时</span><span class="v mono">{{ tz_label }}</span>
+    </div>
+  </header>
+
+  <main class="sheet" id="sheet">
+{% block body %}{% endblock %}
+  </main>
+
+  <footer class="status">
+    <span class="dot" id="status-dot"></span>
+    <span id="status-text">{% block statusline %}{% endblock %}</span>
+    <span class="status-time mono" id="status-time">{{ run.created_at|f_utc if run else "" }}</span>
+  </footer>
+</div>
+<script src="/static/app.js"></script>
+<script src="/static/table.js"></script>
+{% block scripts %}{% endblock %}
+</body>
+</html>

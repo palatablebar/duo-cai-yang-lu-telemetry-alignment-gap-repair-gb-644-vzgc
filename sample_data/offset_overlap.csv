@@ -1,0 +1,3 @@
+sensor_id,sampled_at,offset_seconds,value,unit,quality,ingest_seq
+AM-06,2026-03-01T00:05:30Z,30,12.5,ppm,good,1
+AM-06,2026-03-01T00:10:30Z,30,12.8,ppm,good,2

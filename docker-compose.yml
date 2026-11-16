@@ -1,0 +1,27 @@
+services:
+  app:
+    build: .
+    container_name: gb-644-gridlab
+    environment:
+      GRIDLAB_DB: /app/data/gridlab.db
+      TZ: Asia/Shanghai
+    ports:
+      - "18203:8000"
+    volumes:
+      - gridlab-data:/app/data
+    healthcheck:
+      test:
+        - CMD
+        - python
+        - -c
+        - |
+          import urllib.request
+          with urllib.request.urlopen("http://127.0.0.1:8000/api/health", timeout=3) as r:
+              raise SystemExit(0 if r.status == 200 else 1)
+      interval: 10s
+      timeout: 5s
+      retries: 6
+      start_period: 5s
+
+volumes:
+  gridlab-data:

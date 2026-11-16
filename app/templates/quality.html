@@ -1,0 +1,93 @@
+{% extends "base.html" %}
+{% block title %}质量{% endblock %}
+{% block statusline %}{% if view %}隔离 {{ view.summary.quarantined }} 行{% else %}无运行{% endif %}{% endblock %}
+
+{% block body %}
+<section class="sheet-head">
+  <h1 class="h1">质量隔离</h1>
+  <a class="link" href="/api/quarantine.csv">隔离 CSV</a>
+</section>
+
+{% if view %}
+<section class="block">
+  <div class="block-head">
+    <h2 class="h2">摘要</h2>
+    <span class="block-meta mono">采纳率 {{ view.summary.pass_rate|f_pct }}</span>
+  </div>
+  <div class="scroll">
+    <table class="sheet-grid" data-sheet>
+      <thead>
+        <tr class="letters"><th class="gutter"></th><th>A</th><th class="num">B</th></tr>
+        <tr class="cols"><th class="gutter">#</th><th>项</th><th class="num">值</th></tr>
+      </thead>
+      <tbody>
+        <tr><th class="gutter">1</th><td tabindex="0">原始行</td><td tabindex="0" class="num">{{ view.summary.raw }}</td></tr>
+        <tr><th class="gutter">2</th><td tabindex="0">采纳</td><td tabindex="0" class="num">{{ view.summary.accepted }}</td></tr>
+        <tr><th class="gutter">3</th><td tabindex="0">重复</td><td tabindex="0" class="num">{{ view.summary.duplicates }}</td></tr>
+        <tr><th class="gutter">4</th><td tabindex="0">隔离</td><td tabindex="0" class="num">{{ view.summary.quarantined }}</td></tr>
+        <tr><th class="gutter">5</th><td tabindex="0">非 good 质量位</td><td tabindex="0" class="num">{{ view.summary.suspect }}</td></tr>
+      </tbody>
+    </table>
+  </div>
+</section>
+
+<section class="block">
+  <div class="block-head">
+    <h2 class="h2">原因分布</h2>
+    <span class="block-meta mono">{{ view.distribution|length }} 类</span>
+  </div>
+  <div class="scroll">
+    <table class="sheet-grid" data-sheet>
+      <thead>
+        <tr class="letters"><th class="gutter"></th><th>A</th><th>B</th><th class="num">C</th></tr>
+        <tr class="cols"><th class="gutter">#</th><th>原因码</th><th>说明</th><th class="num">行数</th></tr>
+      </thead>
+      <tbody>
+        {% for item in view.distribution %}
+        <tr>
+          <th class="gutter">{{ loop.index }}</th>
+          <td tabindex="0" class="mono">{{ item.code }}</td>
+          <td tabindex="0">{{ item.label }}</td>
+          <td tabindex="0" class="num">{{ item.count }}</td>
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+</section>
+
+<section class="block">
+  <div class="block-head">
+    <h2 class="h2">隔离行</h2>
+    <span class="block-meta mono">{{ view.rows|length }} / {{ view.summary.quarantined }}</span>
+  </div>
+  {% if view.rows %}
+  <div class="scroll tall">
+    <table class="sheet-grid wide" data-sheet>
+      <thead>
+        <tr class="letters"><th class="gutter"></th><th>A</th><th class="num">B</th><th>C</th><th>D</th><th>E</th><th>F</th></tr>
+        <tr class="cols"><th class="gutter">#</th><th>行号</th><th class="num">传感器</th><th>列</th><th>原值</th><th>原因码</th><th>说明</th></tr>
+      </thead>
+      <tbody>
+        {% for row in view.rows %}
+        <tr>
+          <th class="gutter">{{ loop.index }}</th>
+          <td tabindex="0" class="num">{{ row.source_row }}</td>
+          <td tabindex="0" class="mono">{{ row.sensor_id or "—" }}</td>
+          <td tabindex="0" class="mono">{{ row.column_name }}</td>
+          <td tabindex="0" class="mono" title="{{ row.raw_value }}">{{ row.raw_value }}</td>
+          <td tabindex="0" class="mono">{{ row.code }}</td>
+          <td tabindex="0">{{ row.detail }}</td>
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+  {% else %}
+  <section class="empty"><p class="empty-text">没有隔离行。</p></section>
+  {% endif %}
+</section>
+{% else %}
+<section class="empty"><p class="empty-text">还没有隔离结果。</p></section>
+{% endif %}
+{% endblock %}

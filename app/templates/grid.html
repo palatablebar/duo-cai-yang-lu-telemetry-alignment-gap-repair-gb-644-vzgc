@@ -1,0 +1,90 @@
+{% extends "base.html" %}
+{% block title %}网格{% endblock %}
+{% block statusline %}{% if view %}{{ view.total }} 个网格点{% else %}无运行{% endif %}{% endblock %}
+
+{% block body %}
+<section class="sheet-head">
+  <h1 class="h1">网格对齐</h1>
+  <div class="head-tools">
+    <label class="field">
+      <span class="field-k">传感器</span>
+      <select id="sensor-filter">
+        <option value="">全部</option>
+        {% if view %}{% for item in view.sensors %}<option value="{{ item }}">{{ item }}</option>{% endfor %}{% endif %}
+      </select>
+    </label>
+    <a class="link" href="/api/export/grid.csv">网格 CSV</a>
+  </div>
+</section>
+
+{% if view %}
+<section class="block">
+  <div class="block-head">
+    <h2 class="h2">分账</h2>
+    <span class="block-meta mono">1 分 / 15 分</span>
+  </div>
+  <div class="scroll">
+    <table class="sheet-grid" data-sheet>
+      <thead>
+        <tr class="letters"><th class="gutter"></th><th>A</th><th class="num">B</th><th class="num">C</th><th class="num">D</th></tr>
+        <tr class="cols"><th class="gutter">#</th><th>状态</th><th class="num">点数</th><th class="num">占比</th><th class="num">合计</th></tr>
+      </thead>
+      <tbody>
+        <tr><th class="gutter">1</th><td tabindex="0"><span class="tag ok">OBSERVED</span></td>
+          <td tabindex="0" class="num">{{ view.states.get("OBSERVED", 0) }}</td>
+          <td tabindex="0" class="num">{{ (view.states.get("OBSERVED", 0) / view.total)|f_pct if view.total else "—" }}</td>
+          <td tabindex="0" class="num" rowspan="3">{{ view.total }}</td></tr>
+        <tr><th class="gutter">2</th><td tabindex="0"><span class="tag warn">FILLED</span></td>
+          <td tabindex="0" class="num">{{ view.states.get("FILLED", 0) }}</td>
+          <td tabindex="0" class="num">{{ (view.states.get("FILLED", 0) / view.total)|f_pct if view.total else "—" }}</td></tr>
+        <tr><th class="gutter">3</th><td tabindex="0"><span class="tag bad">GAP</span></td>
+          <td tabindex="0" class="num">{{ view.states.get("GAP", 0) }}</td>
+          <td tabindex="0" class="num">{{ (view.states.get("GAP", 0) / view.total)|f_pct if view.total else "—" }}</td></tr>
+      </tbody>
+    </table>
+  </div>
+</section>
+
+<section class="block grow">
+  <div class="block-head">
+    <h2 class="h2">网格点</h2>
+    <span class="block-meta mono">{{ view.points|length }} / {{ view.total }} · {{ bounds[0]|f_utc("%m-%d %H:%M") if bounds else "—" }}</span>
+  </div>
+  <div class="scroll tall">
+    <table class="sheet-grid wide" id="grid-table" data-sheet>
+      <thead>
+        <tr class="letters"><th class="gutter"></th><th>A</th><th>B</th><th>C</th><th class="num">D</th><th>E</th><th>F</th><th>G</th><th class="num">H</th></tr>
+        <tr class="cols"><th class="gutter">#</th><th>传感器</th><th>桶 UTC</th><th>桶 +08:00</th><th class="num">值</th><th>单位</th><th>状态</th><th>原因</th><th class="num">来源行</th></tr>
+      </thead>
+      <tbody>
+        {% for point in view.points %}
+        <tr data-sensor="{{ point.sensor_id }}" data-bucket="{{ point.bucket_utc }}">
+          <th class="gutter">{{ loop.index }}</th>
+          <td tabindex="0" class="mono">{{ point.sensor_id }}</td>
+          <td tabindex="0" class="mono">{{ point.bucket_utc|f_utc("%m-%d %H:%M") }}</td>
+          <td tabindex="0" class="mono">{{ point.bucket_utc|f_cn("%m-%d %H:%M") }}</td>
+          <td tabindex="0" class="num">{{ point.value|f_num(point.places) if point.value is not none else "—" }}</td>
+          <td tabindex="0">{{ point.unit }}</td>
+          <td tabindex="0"><span class="tag {{ 'ok' if point.state == 'OBSERVED' else ('warn' if point.state == 'FILLED' else 'bad') }}">{{ point.state }}</span></td>
+          <td tabindex="0" class="mono">{{ point.reason or "—" }}</td>
+          <td tabindex="0" class="num">{{ point.source_row if point.source_row is not none else "—" }}</td>
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+</section>
+
+<aside class="inspect" id="inspect" hidden>
+  <div class="inspect-head">
+    <h2 class="h2">证据</h2>
+    <button class="btn ghost" type="button" id="inspect-close">关闭</button>
+  </div>
+  <dl class="inspect-body" id="inspect-body"></dl>
+</aside>
+{% else %}
+<section class="empty"><p class="empty-text">还没有网格点。</p></section>
+{% endif %}
+{% endblock %}
+
+{% block scripts %}<script src="/static/grid.js"></script>{% endblock %}

@@ -1,0 +1,6 @@
+sensor_id,sampled_at,offset_seconds,value,unit,quality,ingest_seq
+TH-02,2026-03-01T00:00:45Z,45,40.000,%RH,good,1
+TH-02,2026-03-01T00:01:45Z,45,41.000,%RH,good,2
+TH-02,2026-03-01T00:04:45Z,45,44.000,%RH,good,3
+TH-02,2026-03-01T00:06:45Z,45,46.000,%RH,good,4
+WS-05,2026-03-01T00:08:12Z,12,3.500,m/s,good,5

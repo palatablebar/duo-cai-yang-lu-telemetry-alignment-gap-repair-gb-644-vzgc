@@ -1,0 +1,128 @@
+{% extends "base.html" %}
+{% block title %}缺口{% endblock %}
+{% block statusline %}{% if view %}缺口 {{ view.summary.gaps }} 桶{% else %}无运行{% endif %}{% endblock %}
+
+{% block body %}
+<section class="sheet-head">
+  <h1 class="h1">缺口修复</h1>
+  <div class="head-tools">
+    <span class="head-meta mono">补齐上限 3 桶</span>
+    <a class="link" href="/api/gaps">缺口 JSON</a>
+  </div>
+</section>
+
+{% if view %}
+<section class="block">
+  <div class="block-head">
+    <h2 class="h2">摘要</h2>
+    <span class="block-meta mono">{{ view.summary.sensors }} 只传感器</span>
+  </div>
+  <div class="scroll">
+    <table class="sheet-grid" data-sheet>
+      <thead>
+        <tr class="letters"><th class="gutter"></th><th>A</th><th class="num">B</th></tr>
+        <tr class="cols"><th class="gutter">#</th><th>项</th><th class="num">值</th></tr>
+      </thead>
+      <tbody>
+        <tr><th class="gutter">1</th><td tabindex="0">补齐桶</td><td tabindex="0" class="num">{{ view.summary.filled }}</td></tr>
+        <tr><th class="gutter">2</th><td tabindex="0">缺口桶</td><td tabindex="0" class="num">{{ view.summary.gaps }}</td></tr>
+        <tr><th class="gutter">3</th><td tabindex="0">窗口</td><td tabindex="0" class="num">{{ view.summary.windows }}</td></tr>
+        <tr><th class="gutter">4</th><td tabindex="0">覆盖不足窗口</td><td tabindex="0" class="num">{{ view.summary.partial }}</td></tr>
+        <tr><th class="gutter">5</th><td tabindex="0">覆盖达标窗口</td><td tabindex="0" class="num">{{ view.summary.ok }}</td></tr>
+      </tbody>
+    </table>
+  </div>
+</section>
+
+<section class="block">
+  <div class="block-head">
+    <h2 class="h2">缺口段</h2>
+    <span class="block-meta mono">{{ view.runs|length }} 段</span>
+  </div>
+  {% if view.runs %}
+  <div class="scroll">
+    <table class="sheet-grid" data-sheet>
+      <thead>
+        <tr class="letters"><th class="gutter"></th><th>A</th><th>B</th><th class="num">C</th><th>D</th><th>E</th><th>F</th></tr>
+        <tr class="cols"><th class="gutter">#</th><th>传感器</th><th>起点</th><th class="num">桶数</th><th>策略</th><th>结果</th><th>原因</th></tr>
+      </thead>
+      <tbody>
+        {% for run in view.runs %}
+        <tr>
+          <th class="gutter">{{ loop.index }}</th>
+          <td tabindex="0" class="mono">{{ run.sensor_id }}</td>
+          <td tabindex="0" class="mono">{{ run.start|f_utc("%m-%d %H:%M") }}</td>
+          <td tabindex="0" class="num">{{ run.length }}</td>
+          <td tabindex="0"><span class="tag quiet">{{ run.fill_policy }}</span></td>
+          <td tabindex="0"><span class="tag {{ 'warn' if run.state == 'FILLED' else 'bad' }}">{{ run.state }}</span></td>
+          <td tabindex="0" class="mono">{{ run.reason }}</td>
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+  {% else %}
+  <section class="empty"><p class="empty-text">没有缺口段。</p></section>
+  {% endif %}
+</section>
+
+<section class="block">
+  <div class="block-head">
+    <h2 class="h2">窗口覆盖</h2>
+    <span class="block-meta mono">{{ view.windows|length }} 个窗口</span>
+  </div>
+  <div class="scroll">
+    <table class="sheet-grid" data-sheet>
+      <thead>
+        <tr class="letters"><th class="gutter"></th><th>A</th><th>B</th><th class="num">C</th><th class="num">D</th><th class="num">E</th><th>F</th></tr>
+        <tr class="cols"><th class="gutter">#</th><th>传感器</th><th>窗口</th><th class="num">实有</th><th class="num">应有</th><th class="num">覆盖度</th><th>状态</th></tr>
+      </thead>
+      <tbody>
+        {% for row in view.windows %}
+        <tr>
+          <th class="gutter">{{ loop.index }}</th>
+          <td tabindex="0" class="mono">{{ row.sensor_id }}</td>
+          <td tabindex="0" class="mono">{{ row.start|f_cn("%m-%d %H:%M") }}</td>
+          <td tabindex="0" class="num">{{ row.observed }}</td>
+          <td tabindex="0" class="num">{{ row.expected }}</td>
+          <td tabindex="0" class="num">{{ row.coverage|f_pct }}</td>
+          <td tabindex="0"><span class="tag {{ 'ok' if row.state == 'OK' else 'warn' }}">{{ row.state }}</span></td>
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+</section>
+
+{% if view.filled %}
+<section class="block">
+  <div class="block-head">
+    <h2 class="h2">补齐值</h2>
+    <span class="block-meta mono">{{ view.filled|length }} 桶</span>
+  </div>
+  <div class="scroll">
+    <table class="sheet-grid" data-sheet>
+      <thead>
+        <tr class="letters"><th class="gutter"></th><th>A</th><th>B</th><th class="num">C</th><th>D</th><th>E</th></tr>
+        <tr class="cols"><th class="gutter">#</th><th>传感器</th><th>桶</th><th class="num">值</th><th>策略</th><th>原因</th></tr>
+      </thead>
+      <tbody>
+        {% for row in view.filled %}
+        <tr>
+          <th class="gutter">{{ loop.index }}</th>
+          <td tabindex="0" class="mono">{{ row.sensor_id }}</td>
+          <td tabindex="0" class="mono">{{ row.bucket_utc|f_utc("%m-%d %H:%M") }}</td>
+          <td tabindex="0" class="num">{{ row.value|f_num(row.places) }}</td>
+          <td tabindex="0"><span class="tag quiet">{{ row.fill_policy }}</span></td>
+          <td tabindex="0" class="mono">{{ row.reason }}</td>
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+</section>
+{% endif %}
+{% else %}
+<section class="empty"><p class="empty-text">还没有缺口结果。</p></section>
+{% endif %}
+{% endblock %}

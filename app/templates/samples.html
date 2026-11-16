@@ -1,0 +1,146 @@
+{% extends "base.html" %}
+{% block title %}采样{% endblock %}
+{% block statusline %}{% if intake %}编码 {{ intake.encoding }}{% else %}无运行{% endif %}{% endblock %}
+
+{% block body %}
+<section class="sheet-head">
+  <h1 class="h1">采样诊断</h1>
+  <span class="head-meta mono">{{ intake.sha256[:16] if intake else "—" }}</span>
+</section>
+
+{% if intake %}
+<section class="block">
+  <div class="block-head">
+    <h2 class="h2">采信</h2>
+    <span class="block-meta mono">{{ intake.byte_size }} B</span>
+  </div>
+  <div class="scroll">
+    <table class="sheet-grid" data-sheet>
+      <thead>
+        <tr class="letters"><th class="gutter"></th><th>A</th><th>B</th></tr>
+        <tr class="cols"><th class="gutter">#</th><th>项</th><th>值</th></tr>
+      </thead>
+      <tbody>
+        <tr><th class="gutter">1</th><td tabindex="0">编码</td><td tabindex="0" class="mono">{{ intake.encoding }}</td></tr>
+        <tr><th class="gutter">2</th><td tabindex="0">BOM</td><td tabindex="0" class="mono">{{ "有" if intake.bom else "无" }}</td></tr>
+        <tr><th class="gutter">3</th><td tabindex="0">分隔符</td><td tabindex="0" class="mono">{{ "逗号" if intake.delimiter == "," else intake.delimiter }}</td></tr>
+        <tr><th class="gutter">4</th><td tabindex="0">分段</td><td tabindex="0" class="mono">{{ intake.segments }}</td></tr>
+        <tr><th class="gutter">5</th><td tabindex="0">空行</td><td tabindex="0" class="mono">{{ intake.blank_lines }}</td></tr>
+        <tr><th class="gutter">6</th><td tabindex="0">尾行</td><td tabindex="0" class="mono">{{ "截断" if intake.truncated else "完整" }}</td></tr>
+      </tbody>
+    </table>
+  </div>
+</section>
+
+<section class="block">
+  <div class="block-head">
+    <h2 class="h2">列映射</h2>
+    <span class="block-meta mono">{{ columns|length }} 列</span>
+  </div>
+  <div class="scroll">
+    <table class="sheet-grid" data-sheet>
+      <thead>
+        <tr class="letters"><th class="gutter"></th><th>A</th><th>B</th><th>C</th></tr>
+        <tr class="cols"><th class="gutter">#</th><th>列</th><th>原始名</th><th>规范名</th></tr>
+      </thead>
+      <tbody>
+        {% for column in columns %}
+        <tr>
+          <th class="gutter">{{ loop.index }}</th>
+          <td tabindex="0" class="mono">{{ column.letter }}</td>
+          <td tabindex="0">{{ column.raw }}</td>
+          <td tabindex="0" class="mono">{{ column.canonical }}</td>
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+</section>
+{% else %}
+<section class="empty"><p class="empty-text">还没有采信结果。</p></section>
+{% endif %}
+
+<section class="block">
+  <div class="block-head">
+    <h2 class="h2">时基契约</h2>
+    <span class="block-meta mono">{{ sensors|length }} 只传感器</span>
+  </div>
+  <div class="scroll">
+    <table class="sheet-grid" data-sheet>
+      <thead>
+        <tr class="letters"><th class="gutter"></th><th>A</th><th>B</th><th class="num">C</th><th class="num">D</th><th>E</th></tr>
+        <tr class="cols"><th class="gutter">#</th><th>编号</th><th>单位</th><th class="num">采样率</th><th class="num">量程</th><th>补齐</th></tr>
+      </thead>
+      <tbody>
+        {% for sensor in sensors %}
+        <tr>
+          <th class="gutter">{{ loop.index }}</th>
+          <td tabindex="0" class="mono">{{ sensor.sensor_id }}</td>
+          <td tabindex="0">{{ sensor.unit }}</td>
+          <td tabindex="0" class="num">{{ sensor.rate }} 分</td>
+          <td tabindex="0" class="num">{{ sensor.low }} ~ {{ sensor.high }}</td>
+          <td tabindex="0"><span class="tag quiet">{{ sensor.policy }}</span></td>
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+</section>
+
+<section class="block">
+  <div class="block-head">
+    <h2 class="h2">设备偏移</h2>
+    <span class="block-meta mono">{{ offsets|length }} 段</span>
+  </div>
+  {% if offsets %}
+  <div class="scroll">
+    <table class="sheet-grid" data-sheet>
+      <thead>
+        <tr class="letters"><th class="gutter"></th><th>A</th><th>B</th><th>C</th><th class="num">D</th></tr>
+        <tr class="cols"><th class="gutter">#</th><th>编号</th><th>生效起</th><th>生效止</th><th class="num">偏移秒</th></tr>
+      </thead>
+      <tbody>
+        {% for item in offsets %}
+        <tr>
+          <th class="gutter">{{ loop.index }}</th>
+          <td tabindex="0" class="mono">{{ item.sensor_id }}</td>
+          <td tabindex="0" class="mono">{{ item.start|f_utc("%m-%d %H:%M") }}</td>
+          <td tabindex="0" class="mono">{{ item.end|f_utc("%m-%d %H:%M") }}</td>
+          <td tabindex="0" class="num">{{ item.seconds }}</td>
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+  {% else %}
+  <section class="empty"><p class="empty-text">还没有偏移表。</p></section>
+  {% endif %}
+</section>
+
+{% if flags %}
+<section class="block">
+  <div class="block-head">
+    <h2 class="h2">标记</h2>
+    <span class="block-meta mono">{{ tb_summary.accepted }} 条采纳</span>
+  </div>
+  <div class="scroll">
+    <table class="sheet-grid" data-sheet>
+      <thead>
+        <tr class="letters"><th class="gutter"></th><th>A</th><th>B</th><th class="num">C</th></tr>
+        <tr class="cols"><th class="gutter">#</th><th>标记</th><th>原因码</th><th class="num">条数</th></tr>
+      </thead>
+      <tbody>
+        {% for item in flags %}
+        <tr>
+          <th class="gutter">{{ loop.index }}</th>
+          <td tabindex="0">{{ item.label }}</td>
+          <td tabindex="0" class="mono">{{ item.code }}</td>
+          <td tabindex="0" class="num">{{ item.count }}</td>
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+</section>
+{% endif %}
+{% endblock %}
